@@ -1,7 +1,6 @@
 package ngram
 
 import (
-	"fmt"
 	"math"
 	"strings"
 )
@@ -18,11 +17,6 @@ type NGram struct {
 	text  string
 	n     int
 	table map[string]int
-}
-
-type NGramPair struct {
-	lang     string
-	distance float64
 }
 
 func (ng *NGram) ParseText(text string) error {
@@ -53,18 +47,23 @@ func (ng *NGram) VectorDist(other *NGram) (float64, error) {
 	return 1.0 - float64(total)/(ng.CalcLength()*other.CalcLength()), nil
 }
 
+type LangDist struct {
+	lang     string
+	distance float64
+}
+
 func (ng *NGram) BestMatch(langs []*NGram) (string, error) {
 	min := math.MaxFloat64
 	count := len(langs)
-	messages := make(chan NGramPair, count)
+	messages := make(chan LangDist, count)
 
 	for _, lang := range langs {
 		go func(ngram *NGram) {
 			dist, err := ng.VectorDist(ngram)
 			if err != nil {
-				messages <- NGramPair{ngram.text, dist}
+				messages <- LangDist{ngram.text, dist}
 			} else {
-				messages <- NGramPair{ngram.text, math.MaxFloat64}
+				messages <- LangDist{ngram.text, math.MaxFloat64}
 			}
 		}(lang)
 	}
@@ -73,7 +72,6 @@ func (ng *NGram) BestMatch(langs []*NGram) (string, error) {
 	for i := 0; i < count; i++ {
 		message, ok := <-messages
 		if ok {
-			fmt.Printf("Received: %s\n", message.lang)
 			if message.distance < min {
 				min = message.distance
 				best = message.lang
